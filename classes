@@ -1,0 +1,83 @@
+@isTest
+private class TestAppointmentTrigger {
+
+    @isTest
+    static void testSingleConflict() {
+        Doctor__c doc = new Doctor__c(Name='Dr. Smith');
+        insert doc;
+
+        Patient__c pat = new Patient__c(Name='John Doe');
+        insert pat;
+        
+        Datetime baseAppointmentTime = System.now().addDays(1).addHours(1);
+
+        Appointment__c existingApp = new Appointment__c(
+            Doctor__c = doc.Id,
+            Patient__c = pat.Id,
+            Appointment_Date__c = baseAppointmentTime
+        );
+        insert existingApp;
+
+        Appointment__c conflictingApp = new Appointment__c(
+            Doctor__c = doc.Id,
+            Patient__c = pat.Id,
+            Appointment_Date__c = baseAppointmentTime 
+        );
+
+        Test.startTest();
+        try {
+            insert conflictingApp;
+            System.assert(false, 'Expected a DmlException for appointment conflict but transaction succeeded.');
+        } catch (DmlException e) {
+            System.assert(e.getMessage().contains('This doctor already has an appointment'), 
+                'Expected conflict error message but received: ' + e.getMessage());
+        }
+        Test.stopTest();
+        
+        System.assertEquals(1, [SELECT count() FROM Appointment__c WHERE Doctor__c = :doc.Id], 
+            'Only one appointment should exist after the failed insertion.');
+    }
+
+    @isTest
+    static void testBulkConflict() {
+        Doctor__c doc1 = new Doctor__c(Name='Dr. Jones');
+        Doctor__c doc2 = new Doctor__c(Name='Dr. House');
+        insert new List<Doctor__c>{doc1, doc2};
+
+        Patient__c pat = new Patient__c(Name='Jane Smith');
+        insert pat;
+        
+        Datetime baseTime = System.now().addDays(2).addMinutes(30);
+
+        List<Appointment__c> existingApps = new List<Appointment__c>{
+            new Appointment__c(Doctor__c = doc1.Id, Patient__c = pat.Id, Appointment_Date__c = baseTime.addHours(1)), 
+            new Appointment__c(Doctor__c = doc2.Id, Patient__c = pat.Id, Appointment_Date__c = baseTime.addHours(2)) 
+        };
+        insert existingApps;
+
+        List<Appointment__c> newApps = new List<Appointment__c>{
+            new Appointment__c(Doctor__c = doc1.Id, Patient__c = pat.Id, Appointment_Date__c = baseTime.addHours(1)),
+            new Appointment__c(Doctor__c = doc2.Id, Patient__c = pat.Id, Appointment_Date__c = baseTime.addHours(3)), 
+            new Appointment__c(Doctor__c = doc2.Id, Patient__c = pat.Id, Appointment_Date__c = baseTime.addHours(2)) 
+        };
+
+        Test.startTest();
+        Database.SaveResult[] results = Database.insert(newApps, false);
+        Test.stopTest();
+
+        System.assertEquals(3, results.size(), 'Expected 3 results from the bulk DML operation.');
+
+        System.assert(!results[0].isSuccess(), 'The first conflicting appointment should have failed.');
+        System.assert(results[0].getErrors()[0].getMessage().contains('This doctor already has an appointment'), 
+                      'Incorrect error message for Result A.');
+        
+        System.assert(results[1].isSuccess(), 'The non-conflicting appointment should have succeeded.');
+
+        System.assert(!results[2].isSuccess(), 'The second conflicting appointment should have failed.');
+        System.assert(results[2].getErrors()[0].getMessage().contains('This doctor already has an appointment'), 
+                      'Incorrect error message for Result C.');
+        
+        System.assertEquals(3, [SELECT count() FROM Appointment__c], 
+            'The total number of appointments in the database should be 3 (2 existing + 1 successful new).');
+    }
+}
