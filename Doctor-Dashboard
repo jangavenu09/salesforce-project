@@ -1,0 +1,47 @@
+public with sharing class AppointmentController {
+    
+    @AuraEnabled(cacheable=true)
+    public static List<Map<String, Object>> getDoctorAppointments() {
+        
+        List<Map<String, Object>> mockAppointments = new List<Map<String, Object>>();
+        Datetime baseTime = System.now().addHours(2);
+        
+        
+        Map<String, Object> app1 = new Map<String, Object>();
+        app1.put('Id', 'a0101');
+        app1.put('Appointment_Date__c', baseTime);
+        app1.put('Status', 'Scheduled');
+        app1.put('PatientId', 'p001');
+        
+        Map<String, String> patient1 = new Map<String, String>();
+        patient1.put('Name', 'Alice Johnson');
+        app1.put('Patient__r', patient1);
+        mockAppointments.add(app1);
+
+        
+        Map<String, Object> app2 = new Map<String, Object>();
+        app2.put('Id', 'a0102');
+        app2.put('Appointment_Date__c', baseTime.addHours(1));
+        app2.put('Status', 'Pending');
+        app2.put('PatientId', 'p002');
+
+        Map<String, String> patient2 = new Map<String, String>();
+        patient2.put('Name', 'Bob Williams');
+        app2.put('Patient__r', patient2);
+        mockAppointments.add(app2);
+
+        
+        Map<String, Object> app3 = new Map<String, Object>();
+        app3.put('Id', 'a0103');
+        app3.put('Appointment_Date__c', baseTime.addHours(3));
+        app3.put('Status', 'Scheduled');
+        app3.put('PatientId', 'p003');
+
+        Map<String, String> patient3 = new Map<String, String>();
+        patient3.put('Name', 'Charlie Davis');
+        app3.put('Patient__r', patient3);
+        mockAppointments.add(app3);
+
+        return mockAppointments;
+    }
+}
